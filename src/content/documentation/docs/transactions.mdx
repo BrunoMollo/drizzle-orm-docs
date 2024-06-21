@@ -35,19 +35,23 @@ await db.transaction(async (tx) => {
 
 You can embed business logic to the transaction and rollback whenever needed:
 
-```ts copy {6}
+```ts copy {7}
 const db = drizzle(...)
 
-await db.transaction(async (tx) => {
-  const [account] = await tx.select({ balance: accounts.balance }).from(accounts).where(eq(users.name, 'Dan'));
-  if (account.balance < 100) {
-    await tx.rollback()
-    return
+try{
+  await db.transaction(async (tx) => {
+    const [account] = await tx.select({ balance: accounts.balance }).from(accounts).where(eq(users.name, 'Dan'));
+    if (account.balance < 100) {
+      tx.rollback() // Throws an error
+    }
+    await tx.update(accounts).set({ balance: sql`${accounts.balance} - 100.00` }).where(eq(users.name, 'Dan'));
+    await tx.update(accounts).set({ balance: sql`${accounts.balance} + 100.00` }).where(eq(users.name, 'Andrew'));
+  });
+} catch(e){
+  if (e instanceof TransactionRollbackError) {
+    // Handle the TransactionRollbackError
   }
-
-  await tx.update(accounts).set({ balance: sql`${accounts.balance} - 100.00` }).where(eq(users.name, 'Dan'));
-  await tx.update(accounts).set({ balance: sql`${accounts.balance} + 100.00` }).where(eq(users.name, 'Andrew'));
-});
+}
 ```
 
 You can return values from the transaction:
